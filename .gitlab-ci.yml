@@ -1,24 +1,23 @@
-# 定义三个阶段
+variables: DOMAIN: "192.168.233.129"
+
 stages:
   - build
   - test
   - deploy
 
-# 构建阶段
-build_job:
+build:
   stage: build
   script:
-    - echo "正在构建项目..."
+    - echo "这个是一个build"
+    - apt update
 
-# 测试阶段
-test_job:
+test:
   stage: test
   script:
-    - echo "正在运行测试..."
+    - echo "现在在一个test"
 
-# 部署阶段
-deploy_job:
+deploy:
   stage: deploy
   script:
-    - echo "正在部署到生产环境..."
-  environment: production
+    - echo "现在在deploy"
+
