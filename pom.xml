@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    parent 说明：
+    这里继承 Spring Boot 官方父 POM。
+
+    对新手来说，可以把它理解成“项目的默认构建模板”：
+    1. 帮我们统一管理大量常见依赖版本；
+    2. 自动配置 Maven 常用插件；
+    3. 降低手工维护版本冲突的成本。
+
+    当前项目使用 Spring Boot 4.0.1，因此后续增加三方依赖时，
+    优先选择与 Boot 4 / Spring Framework 7 兼容的版本。
+  -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.0.1</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.ruici</groupId>
+  <artifactId>ruici-ai-platform</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <name>ruici-ai-platform</name>
+  <description>Ruici AI Platform</description>
+
+  <!--
+    properties 说明：
+    这里集中定义“项目级版本变量”。
+
+    这样做的好处是：
+    1. 升级依赖时只改一处；
+    2. 更容易看清项目技术栈；
+    3. 避免在 dependencies 里到处写死版本号。
+  -->
+  <properties>
+    <!-- Java 语言级别。项目明确要求使用 JDK 21 编译和运行。 -->
+    <java.version>21</java.version>
+
+    <!-- Spring AI 主版本：负责 LLM、Embedding、Vector Store 等 AI 能力。 -->
+    <spring-ai.version>2.0.0-M4</spring-ai.version>
+
+    <!-- Spring AI Agent Utils：提供 agent / tool / schema 等增强能力。 -->
+    <spring-ai-agent-utils.version>0.7.0</spring-ai-agent-utils.version>
+
+    <!-- Apache Tika：用于解析 PDF / DOCX / TXT 等职业文档文本内容。 -->
+    <tika.version>2.9.2</tika.version>
+
+    <!-- Redisson：用于 Redis 缓存、分布式结构、Redis Stream 消费封装。 -->
+    <redisson.version>4.0.0</redisson.version>
+
+    <!-- MapStruct：用于 DTO / Entity / View Object 之间的映射。 -->
+    <mapstruct.version>1.6.3</mapstruct.version>
+
+    <!-- AWS SDK：当前主要用于 S3 兼容对象存储访问。 -->
+    <aws-sdk.version>2.29.51</aws-sdk.version>
+
+    <!-- iText：用于导出职业文档分析报告、情景模拟报告 PDF。 -->
+    <itext.version>8.0.5</itext.version>
+
+    <!-- pinyin4j：用于文件名、检索或拼音相关辅助处理。 -->
+    <pinyin4j.version>2.5.0</pinyin4j.version>
+
+    <!-- springdoc：提供 OpenAPI / Swagger UI 文档页面。 -->
+    <springdoc.version>3.0.2</springdoc.version>
+
+    <!-- Lombok：减少样板代码，如 getter / constructor / builder。 -->
+    <lombok.version>1.18.36</lombok.version>
+
+    <!-- DashScope SDK：对接阿里云相关模型能力。 -->
+    <dashscope.version>2.22.7</dashscope.version>
+
+    <!--
+      victools JSON Schema：
+      Spring AI 运行时会用到这组库生成结构化输出 Schema。
+      这里单独抽成变量，是为了避免 generator / module 版本不一致。
+    -->
+    <victools.jsonschema.version>5.0.0</victools.jsonschema.version>
+
+    <!-- 项目源码与资源文件统一使用 UTF-8。 -->
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <!--
+    repositories 说明：
+    Maven 默认从中央仓库下载依赖。
+    这里额外声明：
+    1. aliyun-public：国内镜像，提升下载速度；
+    2. spring-milestone：用于解析 Spring AI 里程碑版本。
+  -->
+  <repositories>
+    <repository>
+      <id>aliyun-public</id>
+      <url>https://maven.aliyun.com/repository/public/</url>
+    </repository>
+    <repository>
+      <id>spring-milestone</id>
+      <url>https://repo.spring.io/milestone</url>
+    </repository>
+  </repositories>
+
+  <!--
+    dependencyManagement 说明：
+    这里不是“真正引入依赖”，而是“统一规定版本”。
+
+    子依赖真正生效，仍然需要在 <dependencies> 中声明；
+    但版本会优先参考这里的统一约束。
+  -->
+  <dependencyManagement>
+    <dependencies>
+      <!-- Spring AI 官方 BOM：统一管理 Spring AI 相关组件版本。 -->
+      <dependency>
+        <groupId>org.springframework.ai</groupId>
+        <artifactId>spring-ai-bom</artifactId>
+        <version>${spring-ai.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- Spring AI Agent Utils BOM：统一管理 agent 工具链相关版本。 -->
+      <dependency>
+        <groupId>org.springaicommunity</groupId>
+        <artifactId>spring-ai-agent-utils-bom</artifactId>
+        <version>${spring-ai-agent-utils.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!--
+        victools 版本收敛说明（非常重要）：
+
+        本项目里：
+        - Spring AI 会间接引入 victools 的 jsonschema module 5.x；
+        - DashScope SDK 又会间接带入 jsonschema-generator 4.31.1。
+
+        如果 generator 和 module 主版本不一致，项目启动时就会报
+        NoSuchMethodError（这是运行期类冲突，不是编译期错误）。
+
+        因此这里强制把 jsonschema-generator 固定到 5.0.0，
+        确保整条类路径上的 victools 组件保持兼容。
+      -->
+      <dependency>
+        <groupId>com.github.victools</groupId>
+        <artifactId>jsonschema-generator</artifactId>
+        <version>${victools.jsonschema.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <!--
+    dependencies 说明：
+    这里声明“项目真正要用到的依赖”。
+
+    可以按业务大致分成 6 类：
+    1. Spring Boot 基础 Web / Validation / JPA / WebSocket
+    2. AI 能力（Spring AI / Agent Utils）
+    3. 数据与存储（PostgreSQL / H2 / S3）
+    4. 文档解析与导出（Tika / iText）
+    5. 平台增强（Redis / OpenAPI / 拼音等）
+    6. 开发辅助（Lombok / MapStruct / Test）
+  -->
+  <dependencies>
+    <!-- Web MVC：提供 REST API 能力，是后端 HTTP 接口基础。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+    <!-- 参数校验：支持 @Valid / Jakarta Validation。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <!-- JPA：关系型数据库访问基础。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <!-- WebSocket：用于语音交互或实时场景通信。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-websocket</artifactId>
+    </dependency>
+
+    <!-- OpenAI-compatible 模型接入入口。 -->
+    <dependency>
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-starter-model-openai</artifactId>
+    </dependency>
+    <!-- pgvector 向量存储，用于知识库检索。 -->
+    <dependency>
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+    </dependency>
+    <!-- Agent 工具能力支持。 -->
+    <dependency>
+      <groupId>org.springaicommunity</groupId>
+      <artifactId>spring-ai-agent-utils</artifactId>
+    </dependency>
+
+    <!-- PostgreSQL 生产运行时驱动。 -->
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- H2 测试数据库，仅测试环境使用。 -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Tika 核心：文件类型识别与文本解析基础能力。 -->
+    <dependency>
+      <groupId>org.apache.tika</groupId>
+      <artifactId>tika-core</artifactId>
+      <version>${tika.version}</version>
+    </dependency>
+    <!-- Tika 标准解析包：补齐常见 Office / PDF 等解析器。 -->
+    <dependency>
+      <groupId>org.apache.tika</groupId>
+      <artifactId>tika-parsers-standard-package</artifactId>
+      <version>${tika.version}</version>
+    </dependency>
+    <!-- S3 客户端：对接对象存储。 -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <version>${aws-sdk.version}</version>
+    </dependency>
+    <!-- 拼音工具库。 -->
+    <dependency>
+      <groupId>com.belerweb</groupId>
+      <artifactId>pinyin4j</artifactId>
+      <version>${pinyin4j.version}</version>
+    </dependency>
+    <!-- OpenAPI 文档页面。 -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>${springdoc.version}</version>
+    </dependency>
+    <!-- Redis / Redisson 启动器。 -->
+    <dependency>
+      <groupId>org.redisson</groupId>
+      <artifactId>redisson-spring-boot-starter</artifactId>
+      <version>${redisson.version}</version>
+    </dependency>
+    <!-- iText 核心 PDF 组件。 -->
+    <dependency>
+      <groupId>com.itextpdf</groupId>
+      <artifactId>kernel</artifactId>
+      <version>${itext.version}</version>
+    </dependency>
+    <!-- iText 布局组件。 -->
+    <dependency>
+      <groupId>com.itextpdf</groupId>
+      <artifactId>layout</artifactId>
+      <version>${itext.version}</version>
+    </dependency>
+    <!-- iText 底层 IO 组件。 -->
+    <dependency>
+      <groupId>com.itextpdf</groupId>
+      <artifactId>io</artifactId>
+      <version>${itext.version}</version>
+    </dependency>
+    <!-- iText 亚洲字体支持。 -->
+    <dependency>
+      <groupId>com.itextpdf</groupId>
+      <artifactId>font-asian</artifactId>
+      <version>${itext.version}</version>
+    </dependency>
+    <!-- DashScope SDK：用于接入阿里模型生态。 -->
+    <dependency>
+      <groupId>com.alibaba</groupId>
+      <artifactId>dashscope-sdk-java</artifactId>
+      <version>${dashscope.version}</version>
+      <exclusions>
+        <!--
+          排除 DashScope 传递进来的旧版 victools generator。
+          否则它会覆盖上面统一钉住的 5.x 版本，并导致运行期类冲突。
+        -->
+        <exclusion>
+          <groupId>com.github.victools</groupId>
+          <artifactId>jsonschema-generator</artifactId>
+        </exclusion>
+        <!-- 避免引入额外简单日志实现，防止和 Spring Boot 默认日志体系冲突。 -->
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-simple</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- 某些 Jakarta 注解在部分依赖链下需要显式补齐。 -->
+    <dependency>
+      <groupId>jakarta.annotation</groupId>
+      <artifactId>jakarta.annotation-api</artifactId>
+      <version>2.1.1</version>
+    </dependency>
+
+    <!-- Lombok 只参与编译，不进入最终运行包。 -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <version>${lombok.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- MapStruct 运行时 API。 -->
+    <dependency>
+      <groupId>org.mapstruct</groupId>
+      <artifactId>mapstruct</artifactId>
+      <version>${mapstruct.version}</version>
+    </dependency>
+
+    <!-- 单元测试与集成测试基础依赖。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+      <dependency>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-starter-actuator</artifactId>
+      </dependency>
+  </dependencies>
+
+  <!--
+    build 说明：
+    这里放 Maven 构建插件配置。
+  -->
+  <build>
+    <plugins>
+      <!--
+        编译插件：
+        - release=21：强制按 Java 21 语法和字节码编译；
+        - annotationProcessorPaths：显式声明注解处理器，确保 Lombok / MapStruct 正常工作。
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <release>${java.version}</release>
+          <encoding>${project.build.sourceEncoding}</encoding>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok</artifactId>
+              <version>${lombok.version}</version>
+            </path>
+            <path>
+              <groupId>org.mapstruct</groupId>
+              <artifactId>mapstruct-processor</artifactId>
+              <version>${mapstruct.version}</version>
+            </path>
+            <path>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok-mapstruct-binding</artifactId>
+              <version>0.2.0</version>
+            </path>
+          </annotationProcessorPaths>
+        </configuration>
+      </plugin>
+      <!-- Spring Boot 打包与运行插件。 -->
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

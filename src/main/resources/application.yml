@@ -1,0 +1,291 @@
+# Ruici AI Platform Configuration
+# 泛职业文档分析与多场景情景模拟平台配置
+
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
+
+server:
+  port: 8080
+  # 明确指定HTTP响应编码
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+# SpringDoc OpenAPI / Swagger配置
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  packages-to-scan: com.ruici.ai.modules
+
+spring:
+  config:
+    import: optional:file:.env[.properties],optional:classpath:voice-interview-opening.yml
+  application:
+    name: Ruici-AI-Platform
+
+  # 启用虚拟线程 (Java 21+)
+  # 显著提升 I/O 密集型场景的并发能力，特别适合 AI 调用和 SSE 长连接
+  threads:
+    virtual:
+      enabled: true
+
+  # PostgreSQL 数据库配置。
+  # 新手注意：
+  # 1. Spring Boot 只能连接“已经存在”的数据库，不能帮你创建数据库本身。
+  # 2. 如果使用 docker-compose / docker-compose.dev.yml，POSTGRES_DB=ruici_ai_platform 会自动建库。
+  # 3. 如果你是手动安装 PostgreSQL，就必须先手动 CREATE DATABASE ruici_ai_platform。
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ruici_ai_platform}
+    username: ${POSTGRES_USER:postgres}
+    # 与根目录 docker-compose.yml 中 postgres 服务默认一致（本地只起依赖容器 + bootRun 时无需改）
+    password: ${POSTGRES_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # 新手默认请保持 update：
+      # - 会自动创建缺失表 / 增量更新表结构
+      # - 不会替你创建数据库本身
+      # - 不会像 create 一样在重启时清空已有表
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB  # 支持知识库上传（简历限制在业务层检查）
+      max-request-size: 50MB
+  
+
+  # Redisson配置 (使用 spring.redis.redisson，参考官方文档)
+  redis:
+    redisson:
+      # RedissonProperties.config 是字符串，需使用块文本提供 Redisson 原生 YAML。
+      # 如果写成嵌套对象，starter 会忽略该配置并回退到 spring.data.redis 默认值 localhost:6379。
+      config: |
+        singleServerConfig:
+          address: "redis://${REDIS_HOST:localhost}:${REDIS_PORT:6379}"
+          password: "${REDIS_PASSWORD:}"
+          database: 2
+          connectionMinimumIdleSize: 10
+          connectionPoolSize: 64
+          subscriptionConnectionMinimumIdleSize: 1
+          subscriptionConnectionPoolSize: 50
+  
+  # Spring AI 基础 OpenAI-compatible 配置。
+  # 这里主要服务于 Embedding / VectorStore 等基础能力，默认保留 DashScope 作为稳定实现。
+  # 通用聊天默认不走这里，而是通过 app.ai.default-provider + app.ai.providers.* 走第三方中转。
+  ai:
+    openai:
+      base-url: ${AI_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+      api-key: ${AI_EMBEDDING_API_KEY:${AI_BAILIAN_API_KEY}}
+      chat:
+        options:
+          model: ${AI_CHAT_FALLBACK_MODEL:qwen-plus}
+          temperature: 0.2
+      # Embedding 模型配置，默认保留 Qwen 的 text-embedding-v3。
+      embedding:
+        options:
+          model: ${AI_EMBEDDING_MODEL:text-embedding-v3}
+    # 禁用自动重试机制，让异常立即返回
+    retry:
+      max-attempts: 1  # 不重试，失败立即返回
+      on-client-errors: false
+    # PostgreSQL Vector Store 配置。
+    # initialize-schema=true 会帮助开发环境创建 Spring AI 使用的向量表，
+    # 但前提仍然是：数据库 ruici_ai_platform 已存在，且 vector 扩展已可用。
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1024  # text-embedding-v3实际生成的向量维度
+        initialize-schema: true # 开发环境建议 true；生产环境建议 false，由 DBA 或迁移脚本接管。
+        remove-existing-vector-store-table: false  # 保留现有表和数据
+
+# Application custom configuration
+app:
+  ai:
+    # 主聊天 Provider 默认切到第三方 OpenAI-compatible 中转。
+    # 语音与向量化仍保留 DashScope / Qwen。
+    default-provider: ${AI_DEFAULT_PROVIDER:third-party}
+    agent-utils:
+      skills-root: ${APP_AI_AGENT_UTILS_SKILLS_ROOT:classpath:skills}
+    providers:
+      third-party:
+        base-url: ${THIRD_PARTY_BASE_URL:https://api-s.zwenooo.link/v1}
+        api-key: ${THIRD_PARTY_API_KEY:}
+        model: ${THIRD_PARTY_MODEL:gpt-5.2}
+        fallback-model: ${THIRD_PARTY_FALLBACK_MODEL:${AI_CHAT_FALLBACK_MODEL:qwen-plus}}
+      dashscope:
+        base-url: https://dashscope.aliyuncs.com/compatible-mode
+        api-key: ${AI_BAILIAN_API_KEY}
+        model: ${DASHSCOPE_CHAT_MODEL:qwen-turbo}
+      openai:
+        base-url: https://api.openai.com/v1
+        api-key: ${OPENAI_API_KEY:}
+        model: ${OPENAI_MODEL:gpt-5.2}
+      lmstudio:
+        base-url: ${LMSTUDIO_BASE_URL:http://localhost:1234}
+        api-key: ${LMSTUDIO_API_KEY:lm-studio}
+        model: ${LMSTUDIO_MODEL:qwen2.5-7b-instruct}
+    advisors:
+      enabled: ${APP_AI_ADVISORS_ENABLED:true}
+      tool-call-enabled: ${APP_AI_ADVISORS_TOOL_CALL_ENABLED:true}
+      tool-call-conversation-history-enabled: ${APP_AI_ADVISORS_TOOL_CALL_CONVERSATION_HISTORY_ENABLED:false}
+      stream-tool-call-responses: ${APP_AI_ADVISORS_STREAM_TOOL_CALL_RESPONSES:false}
+      message-chat-memory-enabled: ${APP_AI_ADVISORS_MESSAGE_CHAT_MEMORY_ENABLED:false}
+      message-chat-memory-max-messages: ${APP_AI_ADVISORS_MESSAGE_CHAT_MEMORY_MAX_MESSAGES:120}
+      simple-logger-enabled: ${APP_AI_ADVISORS_SIMPLE_LOGGER_ENABLED:false}
+    # 结构化输出重试次数（用于 BeanOutputConverter 解析失败时的业务层重试）
+    structured-max-attempts: ${APP_AI_STRUCTURED_MAX_ATTEMPTS:2}
+    # 重试时是否将上次错误原因注入提示词，帮助模型定向修复输出
+    structured-include-last-error: ${APP_AI_STRUCTURED_INCLUDE_LAST_ERROR:true}
+    # 是否启用“修复型重试提示词”（关闭后每次重试沿用原始 system prompt）
+    structured-retry-use-repair-prompt: ${APP_AI_STRUCTURED_RETRY_USE_REPAIR_PROMPT:true}
+    # 修复型重试提示词中是否追加严格 JSON 指令
+    structured-retry-append-strict-json-instruction: ${APP_AI_STRUCTURED_RETRY_APPEND_STRICT_JSON_INSTRUCTION:true}
+    # 注入到重试提示词中的错误信息最大长度
+    structured-error-message-max-length: ${APP_AI_STRUCTURED_ERROR_MESSAGE_MAX_LENGTH:200}
+    # 是否开启结构化输出调用指标（invocations/attempts/latency）
+    structured-metrics-enabled: ${APP_AI_STRUCTURED_METRICS_ENABLED:true}
+    rag:
+      llm-provider: ${APP_AI_RAG_LLM_PROVIDER:third-party}
+      rewrite:
+        enabled: ${APP_AI_RAG_REWRITE_ENABLED:true}
+      search:
+        short-query-length: ${APP_AI_RAG_SHORT_QUERY_LENGTH:4}
+        topk-short: ${APP_AI_RAG_TOPK_SHORT:20}
+        topk-medium: ${APP_AI_RAG_TOPK_MEDIUM:12}
+        topk-long: ${APP_AI_RAG_TOPK_LONG:8}
+        min-score-short: ${APP_AI_RAG_MIN_SCORE_SHORT:0.18}
+        min-score-default: ${APP_AI_RAG_MIN_SCORE_DEFAULT:0.28}
+  interview:
+    follow-up-count: ${APP_INTERVIEW_FOLLOW_UP_COUNT:1}
+    evaluation:
+      batch-size: ${APP_INTERVIEW_EVALUATION_BATCH_SIZE:8}
+  # 兼容旧键名：resume 实际承载的是通用文档分析能力。
+  resume:
+    upload-dir: ${java.io.tmpdir}/ruici-ai/documents
+    allowed-types:
+      - application/pdf
+      - application/msword
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      - text/plain
+
+  # S3 兼容对象存储配置（MinIO / RustFS 均可）。
+  # 新手注意：
+  # - endpoint 指向对象存储服务
+  # - bucket 必须提前存在，应用不会自动创建 bucket
+  # - 根目录 docker-compose.yml 会自动创建 bucket；docker-compose.dev.yml 仍需手动创建
+  storage:
+    endpoint: ${APP_STORAGE_ENDPOINT:http://localhost:9000}
+    access-key: ${APP_STORAGE_ACCESS_KEY:minioadmin}
+    secret-key: ${APP_STORAGE_SECRET_KEY:minioadmin}
+    bucket: ${APP_STORAGE_BUCKET:ruici-ai-platform}
+    region: ${APP_STORAGE_REGION:us-east-1}
+  
+  # CORS配置 - React前端
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:80,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:80,http://*:5173,http://*:5174,http://*:80,https://*:5173,https://*:5174,https://*:80}
+
+  # 兼容旧键名：voice-interview 当前实际承载通用语音交互能力。
+  voice-interview:
+    # 语音链路默认仍使用 DashScope / Qwen。
+    llm-provider: ${APP_VOICE_INTERVIEW_LLM_PROVIDER:dashscope}
+
+    # Phase duration settings (minutes)
+    phase:
+      intro:
+        min-duration: ${APP_VOICE_INTERVIEW_PHASE_INTRO_MIN_DURATION:3}
+        suggested-duration: ${APP_VOICE_INTERVIEW_PHASE_INTRO_SUGGESTED_DURATION:5}
+        max-duration: ${APP_VOICE_INTERVIEW_PHASE_INTRO_MAX_DURATION:8}
+        min-questions: ${APP_VOICE_INTERVIEW_PHASE_INTRO_MIN_QUESTIONS:2}
+        max-questions: ${APP_VOICE_INTERVIEW_PHASE_INTRO_MAX_QUESTIONS:5}
+      tech:
+        min-duration: ${APP_VOICE_INTERVIEW_PHASE_TECH_MIN_DURATION:8}
+        suggested-duration: ${APP_VOICE_INTERVIEW_PHASE_TECH_SUGGESTED_DURATION:10}
+        max-duration: ${APP_VOICE_INTERVIEW_PHASE_TECH_MAX_DURATION:15}
+        min-questions: ${APP_VOICE_INTERVIEW_PHASE_TECH_MIN_QUESTIONS:3}
+        max-questions: ${APP_VOICE_INTERVIEW_PHASE_TECH_MAX_QUESTIONS:8}
+      project:
+        min-duration: ${APP_VOICE_INTERVIEW_PHASE_PROJECT_MIN_DURATION:8}
+        suggested-duration: ${APP_VOICE_INTERVIEW_PHASE_PROJECT_SUGGESTED_DURATION:10}
+        max-duration: ${APP_VOICE_INTERVIEW_PHASE_PROJECT_MAX_DURATION:15}
+        min-questions: ${APP_VOICE_INTERVIEW_PHASE_PROJECT_MIN_QUESTIONS:2}
+        max-questions: ${APP_VOICE_INTERVIEW_PHASE_PROJECT_MAX_QUESTIONS:5}
+      hr:
+        min-duration: ${APP_VOICE_INTERVIEW_PHASE_HR_MIN_DURATION:3}
+        suggested-duration: ${APP_VOICE_INTERVIEW_PHASE_HR_SUGGESTED_DURATION:5}
+        max-duration: ${APP_VOICE_INTERVIEW_PHASE_HR_MAX_DURATION:8}
+        min-questions: ${APP_VOICE_INTERVIEW_PHASE_HR_MIN_QUESTIONS:2}
+        max-questions: ${APP_VOICE_INTERVIEW_PHASE_HR_MAX_QUESTIONS:5}
+
+    # TTS configuration
+    tts:
+      default-voice: ${APP_VOICE_INTERVIEW_TTS_DEFAULT_VOICE:siyue}  # 思悦 - 温柔自然的女声
+
+    # Qwen3 Realtime ASR Configuration
+    qwen:
+      asr:
+        url: wss://dashscope.aliyuncs.com/api-ws/v1/realtime
+        model: qwen3-asr-flash-realtime
+        api-key: ${AI_BAILIAN_API_KEY}
+        language: zh
+        format: pcm
+        sample-rate: 16000
+        enable-turn-detection: true
+        turn-detection-type: server_vad
+        turn-detection-threshold: 0.0
+        # 静音多久判为一句结束；中文思考停顿常见 2-3s，设 2000 避免句中切段
+        turn-detection-silence-duration-ms: ${APP_VOICE_ASR_SILENCE_MS:2000}
+
+      # Qwen TTS Realtime Configuration (WebSocket-based)
+      # 音色列表文档：https://help.aliyun.com/zh/model-studio/qwen-tts-realtime
+      tts:
+        model: qwen3-tts-flash-realtime
+        api-key: ${AI_BAILIAN_API_KEY}
+        voice: Cherry
+        format: pcm
+        sample-rate: 24000
+        mode: commit
+        language-type: Chinese
+        speech-rate: 1.0
+        volume: 60
+
+    # 用户说完一小段 STT 定稿后，再等多久（毫秒）才触发 AI 助手回复；
+    # 需大于 VAD 静音阈值，以确保用户继续说话时 partials 能取消。
+    user-utterance-debounce-ms: ${APP_VOICE_USER_UTTERANCE_DEBOUNCE_MS:2500}
+    # 触发提交前要求的最小静音时长（毫秒），从最后一次 STT 活动（含 partial）算起。
+    min-silence-before-commit-ms: ${APP_VOICE_MIN_SILENCE_BEFORE_COMMIT_MS:2500}
+    # 当内容较短时先不提交，等待继续说（字符数）。
+    min-commit-chars: ${APP_VOICE_MIN_COMMIT_CHARS:20}
+    # 最长等待用户继续补充的时间（毫秒），超时后强制提交。
+    max-wait-for-continuation-ms: ${APP_VOICE_MAX_WAIT_FOR_CONTINUATION_MS:7000}
+    # 单轮语音交互里 AI 助手回复的最大长度（字符）。
+    ai-question-max-chars: ${APP_VOICE_AI_QUESTION_MAX_CHARS:120}
+
+    # Rate limiting
+    rate-limit:
+      max-per-session: ${APP_VOICE_INTERVIEW_RATE_LIMIT_MAX_PER_SESSION:10}  # messages per second
+      max-per-ip: ${APP_VOICE_INTERVIEW_RATE_LIMIT_MAX_PER_IP:3}  # interviews per hour
+      max-concurrent: ${APP_VOICE_INTERVIEW_RATE_LIMIT_MAX_CONCURRENT:50}  # global concurrent interviews
+
+    # Audio specifications
+    audio:
+      codec: ${APP_VOICE_INTERVIEW_AUDIO_CODEC:opus}
+      sample-rate: ${APP_VOICE_INTERVIEW_AUDIO_SAMPLE_RATE:16000}
+      bit-rate: ${APP_VOICE_INTERVIEW_AUDIO_BIT_RATE:24000}
+      channels: ${APP_VOICE_INTERVIEW_AUDIO_CHANNELS:1}
+      chunk-duration: ${APP_VOICE_INTERVIEW_AUDIO_CHUNK_DURATION:2000}  # 2 seconds

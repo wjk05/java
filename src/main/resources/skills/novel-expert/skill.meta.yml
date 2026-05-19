@@ -1,0 +1,30 @@
+displayName: 小说专家
+display:
+  icon: "NOVEL"
+  gradient: from-amber-500 to-orange-500
+  iconBg: bg-amber-100 dark:bg-amber-900/30
+  iconColor: text-amber-700 dark:text-amber-300
+categories:
+  - key: CHARACTER_DESIGN
+    label: 人物塑造
+    priority: CORE
+    ref: novel-character.md
+    shared: true
+  - key: WORLD_BUILDING
+    label: 世界观构建
+    priority: CORE
+    ref: novel-world-building.md
+    shared: true
+  - key: PLOT_STRUCTURE
+    label: 情节结构
+    priority: CORE
+    ref: novel-plot-structure.md
+    shared: true
+  - key: STYLE_POLISH
+    label: 文风打磨
+    priority: NORMAL
+    ref: novel-style-polish.md
+    shared: true
+  - key: CREATIVE_DIRECTION
+    label: 创作方向
+    priority: ALWAYS_ONE

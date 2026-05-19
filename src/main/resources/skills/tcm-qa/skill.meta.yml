@@ -1,0 +1,25 @@
+displayName: 中医药答疑
+display:
+  icon: "TCM"
+  gradient: from-emerald-500 to-teal-500
+  iconBg: bg-emerald-100 dark:bg-emerald-900/30
+  iconColor: text-emerald-700 dark:text-emerald-300
+categories:
+  - key: TCM_FOUNDATION
+    label: 中医基础理论
+    priority: CORE
+    ref: tcm-foundation.md
+    shared: true
+  - key: HERB_USAGE
+    label: 方药与用法
+    priority: CORE
+    ref: tcm-herb-usage.md
+    shared: true
+  - key: SYNDROME_ANALYSIS
+    label: 辨证思路
+    priority: ALWAYS_ONE
+  - key: SAFETY_BOUNDARY
+    label: 安全边界
+    priority: CORE
+    ref: tcm-safety.md
+    shared: true
