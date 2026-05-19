@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <div align="center">
 
 **Ruici-AI-Platform**
@@ -334,3 +335,6 @@ docker compose up -d --build
 `private/项目重构提示词-优化.md` 是当前重构的设计基线之一。对外文档以本 `README` 为准，对内设计可继续沿 `private/` 目录逐步推进。
 
 同时，`api/README.md` 汇总了当前后端接口入口，供前端逐步迁移使用。
+=======
+# java
+>>>>>>> 295bb73239c4ff0b9a8f0900695bda42a7f696a0
