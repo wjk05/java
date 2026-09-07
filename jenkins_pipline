@@ -1,0 +1,24 @@
+pipeline {
+    agent any
+    stages {
+        stage('拉取GitHub代码') {
+            steps {
+                ping 192.168.233.129:8080
+                echo 'jenkins已经是打开的的状态'
+            }
+        }
+        stage('执行编译') {
+            steps {
+                sh 'time'
+                echo '编译通过'
+            }
+        }
+        stage('运行测试') {
+            steps {
+                sh 'ping baidu.com'
+                echo '所有测试跑完了'
+            }
+        }
+        
+    }
+}
