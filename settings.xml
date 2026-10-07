@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings>
+  <!--
+    让 Maven 中央仓库（central）的请求全部改走阿里云镜像。
+    原因：pom.xml 里的 <repositories> 只对依赖生效，
+    插件自身的依赖仍然直连 repo.maven.apache.org，
+    在容器构建环境里该域名 TLS 握手会被掐断。
+  -->
+  <mirrors>
+    <mirror>
+      <id>aliyun-central-mirror</id>
+      <name>Aliyun Mirror for Central</name>
+      <url>https://maven.aliyun.com/repository/public/</url>
+      <mirrorOf>central</mirrorOf>
+    </mirror>
+  </mirrors>
+</settings>
