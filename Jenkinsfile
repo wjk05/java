@@ -33,7 +33,7 @@
 
           stage('部署') {
               steps {
-                  sh 'kubectl set image deployment/app app=$IMAGE:$TAG'
+                  sh 'kubectl set image deployment/app ruici-app=$IMAGE:$TAG'
                   sh 'kubectl rollout status deployment/app --timeout=180s'
               }
           }
