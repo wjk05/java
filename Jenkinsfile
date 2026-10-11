@@ -18,6 +18,7 @@
               }
           }
 
+       
           stage('构建镜像') {
               steps {
                   sh 'docker build -t $IMAGE:$TAG .'
