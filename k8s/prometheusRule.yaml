@@ -1,0 +1,19 @@
+ apiVersion: monitoring.coreos.com/v1
+  kind: PrometheusRule
+  metadata:
+    name: instance-alert
+    namespace: monitoring
+    labels:
+      release: kube-prometheus-stack    # ← 关键，没这个标签白搭
+  spec:
+    groups:
+    - name: instance          # 组名随便起
+      rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} 已宕机"
+          description: "实例 {{ $labels.instance }} 已经宕机超过 1 分钟。

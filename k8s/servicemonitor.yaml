@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  namespaceSelector:
+    matchNames:
+      - default
+  name: app-monitor
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: app-metrics
+  endpoints:
+  - port: metrics   # 引用 Service 中定义的端口名称
+    path: /metrics
+    interval: 30s
+  namespaceSelector:
+    matchNames:
+    - default

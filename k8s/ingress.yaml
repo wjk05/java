@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ruici-ai
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  ingressClassName: nginx
+  rules:
+    # 前端页面路由
+    - host: ruici.ci.frontend
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend   # 对应你集群里的 frontend Service
+                port:
+                  number: 81
+    #后端页面路由
+    - host: ruici.ci.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app   # 对应你集群里的 frontend Service
+                port:
+                  number: 8080
