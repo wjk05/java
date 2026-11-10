@@ -113,31 +113,44 @@ React 18 + TypeScript + Vite + TailwindCSS 4，位于 `frontend/` 目录。
 
 ```text
 ruici-ai-platform/
-├── src/main/java/com/ruici/ai/
-│   ├── common/                # 通用能力：异常、限流、Provider 路由、Redis Stream
-│   ├── infrastructure/        # 文件、导出、Redis、映射等基础设施
-│   └── modules/
-│       ├── document/          # 文档上传、解析、分析、导出
-│       ├── simulation/        # 情景模拟、题目生成、回答评估
-│       ├── knowledgebase/     # 知识库上传、向量化、RAG 问答
-│       ├── schedule/          # 场景化日程解析与管理
-│       └── voice/             # 语音面试 / 语音交互 / ASR / TTS
-├── src/main/resources/
-│   ├── application.yml
-│   ├── application-dev.yml
-│   ├── logback-spring.xml
-│   ├── voice-interview-opening.yml
-│   ├── fonts/
-│   ├── prompts/
-│   ├── scripts/
-│   └── skills/
-├── frontend/                  # 前端
-├── docker/                    # 脚本
-├── word                       # 测试报告
-├── api/                       # 接口文档
-├── .env.example
-└── docker-compose.yml
+├── src/
+│   ├── main/java/com/ruici/ai/
+│   │   ├── common/                # 通用能力：异常、限流、Provider 路由、Redis Stream
+│   │   ├── infrastructure/        # 文件、导出、Redis、映射等基础设施
+│   │   └── modules/
+│   │       ├── document/          # 文档上传、解析、分析、导出
+│   │       ├── simulation/        # 情景模拟、题目生成、回答评估
+│   │       ├── knowledgebase/     # 知识库上传、向量化、RAG 问答
+│   │       ├── schedule/          # 场景化日程解析与管理
+│   │       └── voice/             # 语音交互 / ASR / TTS
+│   ├── main/resources/            # application.yml、logback、prompts、skills、fonts、scripts
+│   └── test/                      # JUnit 5 测试与测试资源
+├── frontend/                      # React 18 + TypeScript + Vite + TailwindCSS
+│   ├── public/
+│   └── src/                       # api / components / pages / hooks / utils / types / constants
+├── docker/
+│   └── postgres/init.sql          # 数据库初始化（创建 vector 扩展）
+├── k8s/                           # 集群实际使用清单：app、Ingress、Prometheus 监控告警
+├── deploy/k8s/                    # 一键部署套件：deploy.sh、deploy.env.example、manifests
+├── api/                           # 模块接口文档（documents / simulation / knowledgebase / rag-chat / schedule / voice）
+├── word/                          # 版本测试报告与问题记录
+├── Dockerfile                     # 后端多阶段构建（Maven + JRE 21）
+├── docker-compose.yml             # 完整本地编排（应用 + 中间件 + 自动建 bucket）
+├── docker-compose.dev.yml         # 仅启动基础设施（PostgreSQL / Redis / MinIO）
+├── Jenkinsfile                    # Jenkins CI/CD 流水线
+├── .gitlab-ci.yml                 # GitLab CI 流水线
+├── settings.xml                   # Maven 阿里云镜像配置（容器构建用）
+├── .env.example                   # 环境变量模板（复制为 .env）
+├── .dockerignore
+├── .gitignore
+├── pom.xml
+├── SETUP_API_KEYS.md
+├── CLAUDE.md
+├── CODEX_CLAUDE_RULES.md
+└── README.md
 ```
+
+> 说明：`src/main/resources/application-dev.yml`、`application-local.*`、`.env` 等属于本地覆盖配置，已被 `.gitignore` 忽略，不随仓库分发；需要时请从 `.env.example` 复制并按环境填写。
 
 ## 快速开始
 
@@ -327,7 +340,6 @@ bash deploy.sh
 
 详细说明（镜像仓库 / 多节点 / Ingress / 常见问题）见 [`deploy/k8s/README.md`](deploy/k8s/README.md)。
 
-
 ## 运维体系与团队分工
 
 ### 团队构成
@@ -379,6 +391,7 @@ bash deploy.sh
 | 集群资源定位 | 执行 DaemonSet 更新时提示资源不存在 | 按命名空间与资源类型确认真实部署位置，修正运维命令并完成操作 |
 
 > 说明：上述为本人参与处理的典型问题；其中「证书误导入」并非本人操作引入，由本人负责定位与修复。
+
 ## 常见问题
 
 ### 向量化为什么仍然依赖 Qwen / DashScope？
