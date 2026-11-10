@@ -1,0 +1,164 @@
+# Spring Boot 后端：REST API + SSE + WebSocket 语音链路
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: ruici
+    component: backend
+spec:
+  replicas: __APP_REPLICAS__
+  selector:
+    matchLabels:
+      app: ruici
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: ruici
+        component: backend
+      annotations:
+        # 每次执行部署脚本都会变化，强制滚动更新（本地镜像 tag 不变也能生效）
+        ruici.io/deployed-at: "__DEPLOY_TS__"
+    spec:
+      initContainers:
+        - name: wait-postgres
+          image: pgvector/pgvector:pg16
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do
+                echo "waiting for postgres..."
+                sleep 2
+              done
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: ruici-app-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: ruici-app-config
+                  key: POSTGRES_DB
+        - name: wait-redis
+          image: redis:7
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              until redis-cli -h redis -p 6379 ping | grep -q PONG; do
+                echo "waiting for redis..."
+                sleep 2
+              done
+        - name: create-bucket
+          image: minio/mc:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              until mc alias set local http://minio:9000 \
+                  "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null 2>&1; do
+                echo "waiting for minio..."
+                sleep 2
+              done
+              mc mb --ignore-existing "local/$APP_STORAGE_BUCKET"
+              mc anonymous set download "local/$APP_STORAGE_BUCKET" >/dev/null 2>&1 \
+                || mc anonymous set public "local/$APP_STORAGE_BUCKET" >/dev/null 2>&1 \
+                || true
+          env:
+            - name: APP_STORAGE_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: ruici-app-config
+                  key: APP_STORAGE_BUCKET
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ruici-app-secret
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ruici-app-secret
+                  key: MINIO_ROOT_PASSWORD
+      containers:
+        - name: app
+          image: __BACKEND_IMAGE__
+          imagePullPolicy: __IMAGE_PULL_POLICY__
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: ruici-app-config
+            - secretRef:
+                name: ruici-app-secret
+          env:
+            - name: TZ
+              value: Asia/Shanghai
+            - name: JAVA_TOOL_OPTIONS
+              value: >-
+                -XX:InitialRAMPercentage=25
+                -XX:MaxRAMPercentage=70
+                -Dfile.encoding=UTF-8
+                -Duser.timezone=Asia/Shanghai
+          resources:
+            requests:
+              cpu: 300m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 120
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 6
+          volumeMounts:
+            # 文档解析临时目录（java.io.tmpdir），避免写容器可写层
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  labels:
+    app: ruici
+    component: backend
+spec:
+  selector:
+    app: ruici
+    component: backend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

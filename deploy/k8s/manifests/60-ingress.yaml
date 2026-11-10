@@ -1,0 +1,22 @@
+# 可选：Ingress（仅当 deploy.env 中 INGRESS_HOST 非空时才会被部署）
+# 所有流量统一进入前端 Nginx，由它再转发 /api 与 /ws 到后端
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ruici
+  labels:
+    app: ruici
+spec:
+  ingressClassName: __INGRESS_CLASS__
+  __INGRESS_TLS_BLOCK__
+  rules:
+    - host: __INGRESS_HOST__
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

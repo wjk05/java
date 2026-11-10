@@ -1,3 +1,11 @@
+# 注意：本清单仅保留部署结构，敏感信息一律通过 Secret 注入，禁止提交明文密钥。
+# 创建应用 Secret 示例（namespace 按实际部署调整）：
+#   kubectl -n default create secret generic ruici-app-secret \
+#     --from-literal=AI_BAILIAN_API_KEY=<your-key> \
+#     --from-literal=THIRD_PARTY_API_KEY=<your-key>
+# 镜像仓库凭据请使用 kubectl create secret docker-registry regcred ... 创建，不要提交到仓库。
+
+
 ---
 apiVersion: v1
 kind: Service
@@ -119,7 +127,10 @@ spec:
       containers:
         - env:
             - name: AI_BAILIAN_API_KEY
-              value: sk-5edc4eb35a01492386fc851c2763a2b2
+              valueFrom:
+                secretKeyRef:
+                  name: ruici-app-secret
+                  key: AI_BAILIAN_API_KEY
             - name: AI_DEFAULT_PROVIDER
               value: third-party
             - name: AI_EMBEDDING_MODEL
@@ -153,7 +164,10 @@ spec:
             - name: REDIS_PORT
               value: "6379"
             - name: THIRD_PARTY_API_KEY
-              value: sk-5edc4eb35a01492386fc851c2763a2b2
+              valueFrom:
+                secretKeyRef:
+                  name: ruici-app-secret
+                  key: THIRD_PARTY_API_KEY
             - name: THIRD_PARTY_BASE_URL
               value: https://api-s.zwenooo.link/v1
             - name: THIRD_PARTY_MODEL

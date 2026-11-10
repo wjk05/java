@@ -1,0 +1,89 @@
+# Redis 7：会话缓存 + Redis Stream 异步任务队列（建议开启 AOF 持久化）
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data
+  labels:
+    app: ruici
+    component: redis
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: __REDIS_SIZE__
+  __STORAGE_CLASS_LINE__
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: ruici
+    component: redis
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ruici
+      component: redis
+  template:
+    metadata:
+      labels:
+        app: ruici
+        component: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7
+          imagePullPolicy: IfNotPresent
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
+            - --dir
+            - /data
+          ports:
+            - name: redis
+              containerPort: 6379
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 24
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: redis-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app: ruici
+    component: redis
+spec:
+  selector:
+    app: ruici
+    component: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379

@@ -1,0 +1,78 @@
+# React 前端 + Nginx：托管静态资源，并反向代理 /api、/ws 到后端
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: ruici
+    component: frontend
+spec:
+  replicas: __FRONTEND_REPLICAS__
+  selector:
+    matchLabels:
+      app: ruici
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: ruici
+        component: frontend
+      annotations:
+        ruici.io/deployed-at: "__DEPLOY_TS__"
+    spec:
+      containers:
+        - name: frontend
+          image: __FRONTEND_IMAGE__
+          imagePullPolicy: __IMAGE_PULL_POLICY__
+          ports:
+            - name: http
+              containerPort: 80
+          volumeMounts:
+            # 用 ConfigMap 覆盖镜像内的 nginx 配置（补上 WebSocket / SSE 代理）
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: frontend-nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels:
+    app: ruici
+    component: frontend
+spec:
+  type: __FRONTEND_SERVICE_TYPE__
+  selector:
+    app: ruici
+    component: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      __NODE_PORT_LINE__

@@ -1,0 +1,113 @@
+# PostgreSQL 16 + pgvector：业务表 + 向量检索（RAG）
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  labels:
+    app: ruici
+    component: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: __POSTGRES_SIZE__
+  __STORAGE_CLASS_LINE__
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    app: ruici
+    component: postgres
+spec:
+  replicas: 1
+  # 单副本 + RWO 卷：重建时先停止旧 Pod，避免两个 Pod 同时挂载
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ruici
+      component: postgres
+  template:
+    metadata:
+      labels:
+        app: ruici
+        component: postgres
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: ruici-app-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: ruici-app-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ruici-app-secret
+                  key: POSTGRES_PASSWORD
+            - name: TZ
+              value: Asia/Shanghai
+            # 数据目录放在子目录，避免某些存储卷下 lost+found 导致 initdb 失败
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 36
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data
+        - name: init
+          configMap:
+            name: postgres-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app: ruici
+    component: postgres
+spec:
+  selector:
+    app: ruici
+    component: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

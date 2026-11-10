@@ -1,0 +1,54 @@
+# Maven build output
+target/
+
+# Gradle leftovers from reference project
+build/
+/.claude
+/.idea
+/bin/
+# Environment variables
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+# k8s 部署配置（可能包含数据库密码 / API Key）与渲染产物
+deploy/k8s/deploy.env
+deploy/k8s/.rendered/
+test-output.txt
+# IDEA code analysis
+qodana.yaml
+
+/src/main/resources/application-dev.yml
+/docs
+private/
+
+# Local Spring config files that may contain credentials
+application-local.yml
+application-local.yaml
+application-local.properties
+application-dev-local.yml
+application-dev-local.yaml
+application-dev-local.properties
+bootstrap-local.yml
+bootstrap-local.yaml
+bootstrap-local.properties
+
+# Certificates / private keys / keystores
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.cer
+*.der
+id_rsa
+id_dsa
+id_ed25519
+
+# Playwright MCP
+.playwright-mcp/
+.playwright-cli/

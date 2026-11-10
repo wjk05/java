@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <div align="center">
 
 **Ruici-AI-Platform**
@@ -316,6 +315,70 @@ pnpm dev
 docker compose up -d --build
 ```
 
+## Kubernetes 一键部署
+
+项目内置了 k8s 部署套件，别人把项目拷走后执行一个脚本即可完成「构建镜像 + 部署数据库/缓存/对象存储 + 应用上线」：
+
+```bash
+cd deploy/k8s
+cp deploy.env.example deploy.env   # 首次会自动生成，填写 AI Key 即可
+bash deploy.sh
+```
+
+详细说明（镜像仓库 / 多节点 / Ingress / 常见问题）见 [`deploy/k8s/README.md`](deploy/k8s/README.md)。
+
+
+## 运维体系与团队分工
+
+### 团队构成
+
+项目由 6 人团队协作完成：
+
+| 角色 | 人数 | 主要职责 |
+| --- | --- | --- |
+| 前端 | 2 | React 页面开发、交互实现与联调 |
+| 后端 | 2 | 业务模块、AI 能力接入与接口实现 |
+| 运维 | 2 | 集群与部署、CI/CD、网络与证书、监控告警、线上故障处理 |
+
+本人属于运维组，负责并实际参与上述运维工作的大部分内容：集群与容器化部署、CI/CD 流水线、镜像仓库与凭据、Ingress / 网络 / 证书、监控告警，以及线上故障的定位与恢复；同时为前后端联调提供环境、网络与发布支持。
+
+### 基础设施与部署
+
+- **Kubernetes 集群**：kubeadm 方式部署，控制面与工作节点分离，容器运行时为 containerd；已完成 kubelet / docker / containerd 并存环境下的兼容与排查。
+- **部署方式**：
+  - `k8s/`：集群实际使用的清单，包括应用部署（kompose 转换）、Ingress、Prometheus 监控与告警规则；
+  - `deploy/k8s/`：本项目新增的一键部署套件，覆盖 PostgreSQL(pgvector)、Redis、MinIO、后端、前端及可选 Ingress。
+- **中间件**：PostgreSQL 16 + pgvector、Redis 7（缓存与 Redis Stream 异步任务）、MinIO（S3 兼容对象存储）均完成容器化、持久化与健康检查配置。
+- **访问链路**：Nginx Ingress → 前端 Nginx → 后端 Service，统一处理静态资源、`/api`（含 SSE 流式响应）与 `/ws`（语音 WebSocket）。
+
+### CI/CD 与镜像管理
+
+- 使用 Jenkins 流水线（`Jenkinsfile`）完成镜像构建、Docker Hub 登录与推送、`kubectl set image` 滚动发布，并通过 `kubectl rollout status` 校验发布结果。
+- 集群通过 `imagePullSecrets` 注入镜像仓库凭据（`regcred` 等使用 `kubectl create secret docker-registry` 创建，不随仓库提交），避免在业务清单中硬编码账号密码。
+- 构建阶段使用阿里云 Maven 镜像（`settings.xml`），规避容器网络下访问 Maven Central 的 TLS 握手问题。
+- 支持离线部署：`deploy/k8s/deploy.sh` 可将本地构建的镜像直接导入节点 containerd，无需依赖外部镜像仓库。
+
+### 网络、证书与稳定性
+
+- 处理过容器 / 宿主机 DNS 异常、Docker Hub 访问超时、代理链路（客户端代理与 Docker daemon proxy）配置等问题，保证镜像构建与拉取链路稳定。
+- 证书统一在 Ingress 与镜像仓库侧管理，负责证书导入、更新与有效性校验。
+- 通过健康检查、滚动更新、失败重试、restartPolicy 与数据卷持久化保障服务可用性。
+
+### 监控与告警
+
+- `k8s/servicemonitor.yaml`、`k8s/prometheusRule.yaml`、`k8s/alertmanege.yaml` 接入 Prometheus Operator，采集服务指标并配置告警规则。
+- 重点关注 Pod 就绪状态、重启次数、接口错误率与资源使用率，异常时通过 Alertmanager 通知并跟进处理。
+
+### 典型故障处理记录
+
+| 问题 | 现象 | 处理方式 |
+| --- | --- | --- |
+| 证书误导入 | 服务访问异常、证书校验失败 | 定位错误证书来源，回滚误导入的证书并重新导入正确证书，恢复服务（该问题由团队另一名运维同学在操作中引入，本人完成排查与修复） |
+| 代理配置更新卡死 | 客户端提示 `configuration update is already running` | 清理残留核心进程与配置校验锁，恢复配置更新与代理可用性 |
+| 镜像拉取超时 | `docker login` / `docker pull` 连接 Docker Hub 超时 | 为 Docker daemon 配置代理与 DNS，逐项验证 `auth.docker.io`、`registry-1.docker.io` 连通性 |
+| 集群资源定位 | 执行 DaemonSet 更新时提示资源不存在 | 按命名空间与资源类型确认真实部署位置，修正运维命令并完成操作 |
+
+> 说明：上述为本人参与处理的典型问题；其中「证书误导入」并非本人操作引入，由本人负责定位与修复。
 ## 常见问题
 
 ### 向量化为什么仍然依赖 Qwen / DashScope？
@@ -335,6 +398,3 @@ docker compose up -d --build
 `private/项目重构提示词-优化.md` 是当前重构的设计基线之一。对外文档以本 `README` 为准，对内设计可继续沿 `private/` 目录逐步推进。
 
 同时，`api/README.md` 汇总了当前后端接口入口，供前端逐步迁移使用。
-=======
-# java
->>>>>>> 295bb73239c4ff0b9a8f0900695bda42a7f696a0

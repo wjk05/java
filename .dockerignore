@@ -1,0 +1,20 @@
+# 构建上下文瘦身：避免把 node_modules / target / 本地密钥发送给 Docker 守护进程
+.git
+.gitignore
+.idea
+.vscode
+.claude
+.opencode
+target/
+build/
+frontend/node_modules/
+frontend/dist/
+word/
+docs/
+private/
+api/
+deploy/
+*.log
+*.md
+.env
+.env.*
